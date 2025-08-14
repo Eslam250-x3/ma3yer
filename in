@@ -1,0 +1,344 @@
+import React, { useState } from 'react';
+
+// Helper for icons
+const Icon = ({ path, className = "w-6 h-6", strokeWidth = 1.5 }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d={path} />
+    </svg>
+);
+
+// Data for question types
+const questionTypesData = {
+    mcq: {
+        name: 'الاختيار من متعدد (MCQ)',
+        icon: "M3.75 9h16.5m-16.5 6.75h16.5",
+        definition: 'سؤال يطلب من المستخدم اختيار إجابة صحيحة واحدة فقط من بين عدة خيارات.',
+        structure: `type: mcq
+[STEM]
+نص السؤال هنا...
+[CHOICES]
+- خيار خاطئ 1
+* خيار صحيح
+- خيار خاطئ 2`,
+        examples: {
+            'علوم': 'ما هي الوحدة الأساسية للحياة؟\n[CHOICES]\n* الخلية\n- النواة\n- الذرة',
+            'رياضيات': 'ما قيمة `\\pi` مقربة لأقرب منزلتين عشريتين؟\n[CHOICES]\n- 3.12\n- 3.16\n* 3.14',
+        },
+        tip: 'تأكد من وجود نجمة `*` واحدة فقط. وجود أكثر من نجمة سيحول السؤال تلقائيًا إلى MRQ.'
+    },
+    mrq: {
+        name: 'الاختيار المتعدد (MRQ)',
+        icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+        definition: 'سؤال يطلب من المستخدم اختيار كل الإجابات الصحيحة (يمكن أن تكون إجابة واحدة أو أكثر).',
+        structure: `type: mrq
+[STEM]
+نص السؤال هنا...
+[CHOICES]
+* خيار صحيح 1
+- خيار خاطئ
+* خيار صحيح 2`,
+        examples: {
+            'جغرافيا': 'أي من هذه الدول تقع في قارة أفريقيا؟\n[CHOICES]\n* مصر\n- البرازيل\n* نيجيريا\n* جنوب أفريقيا',
+            'فيزياء': 'اختر كل الوحدات التي تقيس القوة:\n[CHOICES]\n* نيوتن\n- جول\n* داين',
+        },
+        tip: 'يمكن استخدام MRQ حتى لو كانت هناك إجابة صحيحة واحدة فقط، مما يضيف تحديًا للمستخدم.'
+    },
+    matching: {
+        name: 'المطابقة (Matching)',
+        icon: "M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5",
+        definition: 'سؤال يطلب من المستخدم مطابقة عناصر من قائمتين.',
+        structure: `type: matching
+[STEM]
+صل كل دولة بعاصمتها...
+[MATCHING_PAIRS]
+مصر | القاهرة
+السعودية | الرياض
+فرنسا | باريس`,
+        examples: {
+            'كيمياء': 'صل كل عنصر برمزه الكيميائي:\n[MATCHING_PAIRS]\nالأكسجين | O\nالهيدروجين | H\nالذهب | Au',
+            'أدب': 'صل كل كاتب بأشهر أعماله:\n[MATCHING_PAIRS]\nنجيب محفوظ | الثلاثية\nطه حسين | الأيام\nتوفيق الحكيم | أهل الكهف'
+        },
+        mistake: 'الخطأ الشائع هو عدم استخدام الفاصل `|` بين العنصرين في كل سطر. تأكد من وجوده.'
+    },
+    gapText: {
+        name: 'ملء الفراغات (Gapped Text)',
+        icon: "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5",
+        definition: 'سؤال يحتوي على نص به فراغات ليقوم المستخدم بملئها بالإجابات الصحيحة بالترتيب.',
+        structure: `type: gapText
+[STEM]
+نص السؤال يحتوي على [BLANK] واحد أو أكثر.
+[GAPS]
+الإجابة الأولى للفراغ الأول
+الإجابة الثانية للفراغ الثاني`,
+        examples: {
+            'علوم': 'يتكون الماء من ذرتي [BLANK] وذرة [BLANK] واحدة.\n[GAPS]\nهيدروجين\nأكسجين',
+            'رياضيات': 'نظرية فيثاغورس تنص على أن `a^2 + b^2 = [BLANK]`.\n[GAPS]\nc^2'
+        },
+        tip: 'استخدم `[BLANK]` في نص السؤال لكل فراغ. عدد الإجابات في قسم `[GAPS]` يجب أن يطابق عدد الفراغات.'
+    },
+    string: {
+        name: 'إجابة قصيرة (String)',
+        icon: "M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z",
+        definition: 'سؤال يتطلب إجابة نصية قصيرة ومحددة.',
+        structure: `type: string
+[STEM]
+نص السؤال...
+[ANSWER]
+الإجابة النصية الدقيقة`,
+        examples: {
+            'رياضيات': 'حل المعادلة `2x - 4 = 10`.\n[ANSWER]\nx = 7',
+            'لغة إنجليزية': 'What is the past tense of the verb "go"?\n[ANSWER]\nwent'
+        },
+        tip: 'مثالي للأسئلة التي لها إجابة واحدة صحيحة لا تحتمل اللبس، مثل المصطلحات أو حلول المعادلات البسيطة.'
+    },
+    frq: {
+        name: 'إجابة حرة (FRQ)',
+        icon: "M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5",
+        definition: 'سؤال مقالي يتطلب إجابة مفتوحة أو شرحًا، ويتم توفير إجابة نموذجية للمقارنة.',
+        structure: `type: frq
+[STEM]
+اشرح أسباب الثورة الفرنسية...
+[ANSWER]
+الإجابة النموذجية الطويلة هنا...`,
+        examples: {
+            'تاريخ': 'وضح كيف أثرت قناة السويس على التجارة العالمية في القرن التاسع عشر.\n[ANSWER]\nأدت قناة السويس إلى تقصير المسافات بشكل كبير بين أوروبا وآسيا، مما قلل من تكاليف الشحن والوقت...'
+        },
+        tip: 'يستخدم هذا النوع للتقييم الذي يتطلب فهمًا عميقًا وتحليلاً، وليس مجرد استدعاء للمعلومات.'
+    },
+    oq: {
+        name: 'الترتيب (Ordering)',
+        icon: "M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0-3.75-3.75M17.25 21 21 17.25",
+        definition: 'سؤال يطلب من المستخدم ترتيب قائمة من العناصر وفقًا لمعيار معين.',
+        structure: `type: oq
+[STEM]
+رتّب الكواكب التالية من الأقرب إلى الأبعد عن الشمس...
+[CHOICES]
+عطارد
+الزهرة
+الأرض
+المريخ`,
+        examples: {
+            'تاريخ': 'رتّب الأحداث التالية ترتيبًا زمنيًا من الأقدم للأحدث:\n[CHOICES]\nبناء الأهرامات\nالثورة الفرنسية\nاكتشاف أمريكا',
+        },
+        tip: 'اكتب الخيارات بالترتيب الصحيح. ستقوم الأداة بخلطها تلقائيًا عند التصدير.'
+    },
+    input_box: {
+        name: 'صندوق الإدخال (Input Box)',
+        icon: "M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25v8.25A2.25 2.25 0 0 1 18 20.25h-7.5A2.25 2.25 0 0 1 8.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25h6a2.25 2.25 0 0 0 2.25-2.25V10.5A2.25 2.25 0 0 0 16.5 8.25Z",
+        definition: 'سؤال يتطلب إجابة رقمية، مع إمكانية تحديد وحدة قياس.',
+        structure: `type: input_box
+[STEM]
+ما هي درجة غليان الماء بالدرجة المئوية؟
+[ANSWER]
+100 | C`,
+        examples: {
+            'فيزياء': 'سيارة تسير بسرعة 20 م/ث. ما المسافة التي تقطعها في 5 ثوانٍ؟\n[ANSWER]\n100 | m',
+        },
+        mistake: 'استخدم الفاصل `|` بين القيمة الرقمية والوحدة. إذا لم تكن هناك وحدة، اكتب القيمة فقط.'
+    },
+    frq_ai: {
+        name: 'إجابة حرة (AI)',
+        icon: "M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+        definition: 'مثل سؤال الإجابة الحرة، ولكنه مصمم ليتم تقييمه بواسطة الذكاء الاصطناعي باستخدام قالب تقييم محدد.',
+        structure: `type: frq_ai
+ai_template_id: 123456789012
+[STEM]
+اشرح مفهوم التكافل في علم الأحياء...
+[ANSWER]
+الإجابة النموذجية هنا...`,
+        examples: {
+            'أحياء': 'ai_template_id: 352108393701\n[STEM]\nصف عملية البناء الضوئي.\n[ANSWER]\nهي عملية تحويل الطاقة الضوئية إلى طاقة كيميائية...'
+        },
+        tip: 'يجب دائمًا تحديد `ai_template_id` لهذا النوع من الأسئلة. يمكن إضافته هنا أو عبر ميزة "Subject Template ID".'
+    },
+};
+
+const CodeBlock = ({ code }) => (
+    <pre className="bg-gray-800 text-white p-4 rounded-lg font-mono text-sm text-left direction-ltr whitespace-pre-wrap">
+        <code>{code}</code>
+    </pre>
+);
+
+const ProTip = ({ children, type = 'tip' }) => {
+    const baseClasses = "p-4 mt-6 rounded-lg";
+    const typeClasses = {
+        tip: "border-r-4 border-blue-500 bg-blue-50 text-blue-800",
+        mistake: "border-r-4 border-red-500 bg-red-50 text-red-800"
+    };
+    const title = type === 'tip' ? 'نصيحة احترافية' : 'خطأ شائع';
+
+    return (
+        <div className={`${baseClasses} ${typeClasses[type]}`}>
+            <p><strong className="font-bold">{title}:</strong> {children}</p>
+        </div>
+    );
+};
+
+const WorkflowDiagram = () => (
+    <div className="my-12">
+        <h3 className="text-2xl font-bold text-center mb-8">مخطط سير العمل</h3>
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0 text-center text-sm">
+            <div className="flex flex-col items-center p-2">
+                <div className="w-24 h-24 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full shadow-md">
+                    <Icon path="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-12 h-12 text-gray-500" strokeWidth="1" />
+                </div>
+                <span className="font-bold mt-2">1. نص خام</span>
+            </div>
+            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
+            <div className="flex flex-col items-center p-2">
+                <div className="w-24 h-24 flex items-center justify-center bg-purple-100 border-2 border-purple-300 rounded-full shadow-md">
+                    <Icon path="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" className="w-12 h-12 text-purple-600" strokeWidth="1" />
+                </div>
+                <span className="font-bold mt-2">2. تحسين بـ AI</span>
+                <span className="text-xs text-gray-500">(اختياري)</span>
+            </div>
+            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
+            <div className="flex flex-col items-center p-2">
+                <div className="w-24 h-24 flex items-center justify-center bg-blue-100 border-2 border-blue-300 rounded-full shadow-md">
+                    <Icon path="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" className="w-12 h-12 text-blue-600" strokeWidth="1" />
+                </div>
+                <span className="font-bold mt-2">3. تحليل ذكي</span>
+            </div>
+            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
+            <div className="flex flex-col items-center p-2">
+                <div className="w-24 h-24 flex items-center justify-center bg-yellow-100 border-2 border-yellow-400 rounded-full shadow-md">
+                    <Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className="w-12 h-12 text-yellow-600" strokeWidth="1" />
+                </div>
+                <span className="font-bold mt-2">4. مراجعة وتعديل</span>
+            </div>
+            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
+            <div className="flex flex-col items-center p-2">
+                <div className="w-24 h-24 flex items-center justify-center bg-green-100 border-2 border-green-300 rounded-full shadow-md">
+                    <Icon path="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" className="w-12 h-12 text-green-600" strokeWidth="1" />
+                </div>
+                <span className="font-bold mt-2">5. تصدير</span>
+                <span className="text-xs text-gray-500">(JSON, ZIP, CSV)</span>
+            </div>
+        </div>
+    </div>
+);
+
+
+const App = () => {
+    const [activeTab, setActiveTab] = useState(Object.keys(questionTypesData)[0]);
+
+    const renderTabContent = () => {
+        const type = questionTypesData[activeTab];
+        if (!type) return null;
+
+        return (
+            <div className="p-5 bg-white rounded-b-lg rounded-tl-lg border border-gray-200 shadow-inner">
+                <p className="text-lg text-gray-700">{type.definition}</p>
+                <h4 className="text-xl font-bold mt-6 mb-2">البنية الأساسية:</h4>
+                <CodeBlock code={type.structure} />
+                <h4 className="text-xl font-bold mt-6">أمثلة عملية:</h4>
+                {Object.entries(type.examples).map(([subject, exampleCode]) => (
+                    <div key={subject}>
+                        <h5 className="font-semibold mt-4">{subject}:</h5>
+                        <CodeBlock code={exampleCode.startsWith('ai_template_id') ? exampleCode : `[STEM]\n${exampleCode}`} />
+                    </div>
+                ))}
+                <ProTip type={type.mistake ? 'mistake' : 'tip'}>
+                    {type.tip || type.mistake}
+                </ProTip>
+            </div>
+        );
+    };
+
+    return (
+        <div className="antialiased bg-gray-50 text-gray-800" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+            <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                <header className="text-center mb-12">
+                    <div className="inline-block bg-indigo-100 text-indigo-700 p-4 rounded-2xl shadow-md mb-4">
+                        <Icon path="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0V5.625m0 0H10.5m2.25-2.25H15M10.5 12.75a2.25 2.25 0 1 1 4.5 0 2.25 2.25 0 0 1-4.5 0Zm-4.5 4.5a2.25 2.25 0 1 1 4.5 0 2.25 2.25 0 0 1-4.5 0Zm11.25-8.25a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" className="w-12 h-12" strokeWidth="1"/>
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900">الدليل الإرشادي التفاعلي</h1>
+                    <p className="text-lg text-gray-600 mt-4 max-w-3xl mx-auto">دليلك الكامل لإتقان "محول الأسئلة الذكي". هذا الدليل مبني باستخدام React لمساعدتك على تحقيق أقصى استفادة من كل ميزة.</p>
+                </header>
+
+                <main className="prose-ar max-w-none">
+                    <section className="mb-16">
+                        <WorkflowDiagram />
+                    </section>
+
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-center mb-8">أنواع الأسئلة وبنيتها</h2>
+                        <div className="mb-4 border-b border-gray-200">
+                            <nav className="-mb-px flex flex-wrap gap-x-2" aria-label="Tabs">
+                                {Object.entries(questionTypesData).map(([key, { name, icon }]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setActiveTab(key)}
+                                        className={`flex items-center gap-2 whitespace-nowrap py-3 px-4 text-md font-medium border-b-2 transition-colors duration-200 rounded-t-lg ${
+                                            activeTab === key ? 'border-indigo-500 bg-indigo-50 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        <Icon path={icon} className="w-5 h-5" strokeWidth="2" />
+                                        {name}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                        <div>{renderTabContent()}</div>
+                    </section>
+                    
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-center mb-8">التنسيق المتقدم</h2>
+                         <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-xl text-indigo-600">الأسئلة متعددة الأجزاء</h3>
+                                <p className="mt-2">استخدم `[STATEMENT]` لمقدمة السؤال، و`[PART]` لكل جزء. الأداة ستفهم البنية تلقائيًا.</p>
+                                <CodeBlock code={`[STATEMENT]\nاقرأ القطعة التالية ثم أجب...\n\n---\n\n[PART]\ntype: mcq\n[STEM]\nما الفكرة الرئيسية للقطعة؟\n[CHOICES]\n* ...`} />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-xl text-indigo-600">المسافات المخصصة</h3>
+                                <p className="mt-2">لإضافة مسافة إضافية (`&lt;span&gt;`) في أي مكان، استخدم الوسم `[SPACE]`. تحكم كامل في التنسيق.</p>
+                                <CodeBlock code={`[STEM]\nما عاصمة مصر[SPACE].`} />
+                            </div>
+                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-xl text-indigo-600">المعرفات المؤقتة (IDs)</h3>
+                                <p className="mt-2">عند إنشاء سؤال جديد، استخدم `id: new1`، `id: new2` وهكذا. ستطالبك الأداة بإدخال الأرقام الرسمية عند التحليل.</p>
+                                <CodeBlock code={`id: new1\ntype: mcq\n...`} />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="mb-16">
+                        <h2 className="text-3xl font-bold text-center mb-8">تسخير قوة الذكاء الاصطناعي</h2>
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                             <p className="mt-2 text-gray-600">ميزة "التحسين بالـ AI" تحول النص الفوضوي إلى تنسيق منظم. شاهد كيف تتعامل مع نص غير منسق تمامًا:</p>
+                            <div className="grid md:grid-cols-2 gap-4 mt-4">
+                                <div>
+                                    <h5 className="font-semibold text-red-600">النص الخام (قبل)</h5>
+                                    <div className="code-block mt-2 text-xs">س1: ما عاصمة السعودية الرياض * جدة - الدمام. س2 لونه أزرق و طعمه حلو ما هو؟ السماء. الإجابة: المحيط.</div>
+                                </div>
+                                <div>
+                                    <h5 className="font-semibold text-green-600">النص المنسق (بعد)</h5>
+                                    <div className="code-block mt-2 text-xs">{`type: mcq
+[STEM]
+ما عاصمة السعودية
+[CHOICES]
+* الرياض
+- جدة
+- الدمام
+---
+type: string
+[STEM]
+لونه أزرق و طعمه حلو ما هو؟ السماء.
+[ANSWER]
+المحيط`}</div>
+                                </div>
+                            </div>
+                             <ProTip>
+                                للحصول على أفضل النتائج من الذكاء الاصطناعي، حاول أن يكون النص الأصلي واضحًا قدر الإمكان. حتى لو لم يكن منسقًا، فإن استخدام ترقيم واضح أو علامات مميزة للإجابات الصحيحة يساعد النموذج على فهم قصدك بشكل أسرع وأكثر دقة.
+                            </ProTip>
+                        </div>
+                    </section>
+
+                </main>
+            </div>
+        </div>
+    );
+};
+
+export default App;
