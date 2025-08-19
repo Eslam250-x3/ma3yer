@@ -1,344 +1,652 @@
-import React, { useState } from 'react';
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الدليل التفاعلي الكامل لمحول الأسئلة الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f8fafc;
+        }
+        html[lang="en"] body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #4f46e5, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tab-btn.active {
+            border-color: #6d28d9;
+            background-color: #ede9fe;
+            color: #6d28d9;
+            font-weight: 700;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .prompt-code {
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid #475569;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+        }
+        html[dir="ltr"] .copy-btn {
+            left: auto;
+            right: 12px;
+        }
+        .copy-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: #94a3b8;
+        }
+        .accordion-header.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
 
-// Helper for icons
-const Icon = ({ path, className = "w-6 h-6", strokeWidth = 1.5 }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d={path} />
-    </svg>
-);
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-12 relative">
+            <button id="lang-switcher" class="absolute top-0 right-0 bg-white border-2 border-purple-200 text-purple-700 font-bold py-2 px-4 rounded-lg hover:bg-purple-50 transition-colors duration-300">
+                English
+            </button>
+            <h1 id="main-title" class="text-4xl md:text-6xl font-extrabold gradient-text mb-4">
+                <!-- Populated by JS -->
+            </h1>
+            <p id="main-subtitle" class="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
+                <!-- Populated by JS -->
+            </p>
+        </header>
 
-// Data for question types
-const questionTypesData = {
-    mcq: {
-        name: 'الاختيار من متعدد (MCQ)',
-        icon: "M3.75 9h16.5m-16.5 6.75h16.5",
-        definition: 'سؤال يطلب من المستخدم اختيار إجابة صحيحة واحدة فقط من بين عدة خيارات.',
-        structure: `type: mcq
-[STEM]
-نص السؤال هنا...
-[CHOICES]
-- خيار خاطئ 1
-* خيار صحيح
-- خيار خاطئ 2`,
-        examples: {
-            'علوم': 'ما هي الوحدة الأساسية للحياة؟\n[CHOICES]\n* الخلية\n- النواة\n- الذرة',
-            'رياضيات': 'ما قيمة `\\pi` مقربة لأقرب منزلتين عشريتين؟\n[CHOICES]\n- 3.12\n- 3.16\n* 3.14',
-        },
-        tip: 'تأكد من وجود نجمة `*` واحدة فقط. وجود أكثر من نجمة سيحول السؤال تلقائيًا إلى MRQ.'
-    },
-    mrq: {
-        name: 'الاختيار المتعدد (MRQ)',
-        icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
-        definition: 'سؤال يطلب من المستخدم اختيار كل الإجابات الصحيحة (يمكن أن تكون إجابة واحدة أو أكثر).',
-        structure: `type: mrq
-[STEM]
-نص السؤال هنا...
-[CHOICES]
-* خيار صحيح 1
-- خيار خاطئ
-* خيار صحيح 2`,
-        examples: {
-            'جغرافيا': 'أي من هذه الدول تقع في قارة أفريقيا؟\n[CHOICES]\n* مصر\n- البرازيل\n* نيجيريا\n* جنوب أفريقيا',
-            'فيزياء': 'اختر كل الوحدات التي تقيس القوة:\n[CHOICES]\n* نيوتن\n- جول\n* داين',
-        },
-        tip: 'يمكن استخدام MRQ حتى لو كانت هناك إجابة صحيحة واحدة فقط، مما يضيف تحديًا للمستخدم.'
-    },
-    matching: {
-        name: 'المطابقة (Matching)',
-        icon: "M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5",
-        definition: 'سؤال يطلب من المستخدم مطابقة عناصر من قائمتين.',
-        structure: `type: matching
-[STEM]
-صل كل دولة بعاصمتها...
-[MATCHING_PAIRS]
-مصر | القاهرة
-السعودية | الرياض
-فرنسا | باريس`,
-        examples: {
-            'كيمياء': 'صل كل عنصر برمزه الكيميائي:\n[MATCHING_PAIRS]\nالأكسجين | O\nالهيدروجين | H\nالذهب | Au',
-            'أدب': 'صل كل كاتب بأشهر أعماله:\n[MATCHING_PAIRS]\nنجيب محفوظ | الثلاثية\nطه حسين | الأيام\nتوفيق الحكيم | أهل الكهف'
-        },
-        mistake: 'الخطأ الشائع هو عدم استخدام الفاصل `|` بين العنصرين في كل سطر. تأكد من وجوده.'
-    },
-    gapText: {
-        name: 'ملء الفراغات (Gapped Text)',
-        icon: "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5",
-        definition: 'سؤال يحتوي على نص به فراغات ليقوم المستخدم بملئها بالإجابات الصحيحة بالترتيب.',
-        structure: `type: gapText
-[STEM]
-نص السؤال يحتوي على [BLANK] واحد أو أكثر.
-[GAPS]
-الإجابة الأولى للفراغ الأول
-الإجابة الثانية للفراغ الثاني`,
-        examples: {
-            'علوم': 'يتكون الماء من ذرتي [BLANK] وذرة [BLANK] واحدة.\n[GAPS]\nهيدروجين\nأكسجين',
-            'رياضيات': 'نظرية فيثاغورس تنص على أن `a^2 + b^2 = [BLANK]`.\n[GAPS]\nc^2'
-        },
-        tip: 'استخدم `[BLANK]` في نص السؤال لكل فراغ. عدد الإجابات في قسم `[GAPS]` يجب أن يطابق عدد الفراغات.'
-    },
-    string: {
-        name: 'إجابة قصيرة (String)',
-        icon: "M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z",
-        definition: 'سؤال يتطلب إجابة نصية قصيرة ومحددة.',
-        structure: `type: string
-[STEM]
-نص السؤال...
-[ANSWER]
-الإجابة النصية الدقيقة`,
-        examples: {
-            'رياضيات': 'حل المعادلة `2x - 4 = 10`.\n[ANSWER]\nx = 7',
-            'لغة إنجليزية': 'What is the past tense of the verb "go"?\n[ANSWER]\nwent'
-        },
-        tip: 'مثالي للأسئلة التي لها إجابة واحدة صحيحة لا تحتمل اللبس، مثل المصطلحات أو حلول المعادلات البسيطة.'
-    },
-    frq: {
-        name: 'إجابة حرة (FRQ)',
-        icon: "M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5",
-        definition: 'سؤال مقالي يتطلب إجابة مفتوحة أو شرحًا، ويتم توفير إجابة نموذجية للمقارنة.',
-        structure: `type: frq
-[STEM]
-اشرح أسباب الثورة الفرنسية...
-[ANSWER]
-الإجابة النموذجية الطويلة هنا...`,
-        examples: {
-            'تاريخ': 'وضح كيف أثرت قناة السويس على التجارة العالمية في القرن التاسع عشر.\n[ANSWER]\nأدت قناة السويس إلى تقصير المسافات بشكل كبير بين أوروبا وآسيا، مما قلل من تكاليف الشحن والوقت...'
-        },
-        tip: 'يستخدم هذا النوع للتقييم الذي يتطلب فهمًا عميقًا وتحليلاً، وليس مجرد استدعاء للمعلومات.'
-    },
-    oq: {
-        name: 'الترتيب (Ordering)',
-        icon: "M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0-3.75-3.75M17.25 21 21 17.25",
-        definition: 'سؤال يطلب من المستخدم ترتيب قائمة من العناصر وفقًا لمعيار معين.',
-        structure: `type: oq
-[STEM]
-رتّب الكواكب التالية من الأقرب إلى الأبعد عن الشمس...
-[CHOICES]
-عطارد
-الزهرة
-الأرض
-المريخ`,
-        examples: {
-            'تاريخ': 'رتّب الأحداث التالية ترتيبًا زمنيًا من الأقدم للأحدث:\n[CHOICES]\nبناء الأهرامات\nالثورة الفرنسية\nاكتشاف أمريكا',
-        },
-        tip: 'اكتب الخيارات بالترتيب الصحيح. ستقوم الأداة بخلطها تلقائيًا عند التصدير.'
-    },
-    input_box: {
-        name: 'صندوق الإدخال (Input Box)',
-        icon: "M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25v8.25A2.25 2.25 0 0 1 18 20.25h-7.5A2.25 2.25 0 0 1 8.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25h6a2.25 2.25 0 0 0 2.25-2.25V10.5A2.25 2.25 0 0 0 16.5 8.25Z",
-        definition: 'سؤال يتطلب إجابة رقمية، مع إمكانية تحديد وحدة قياس.',
-        structure: `type: input_box
-[STEM]
-ما هي درجة غليان الماء بالدرجة المئوية؟
-[ANSWER]
-100 | C`,
-        examples: {
-            'فيزياء': 'سيارة تسير بسرعة 20 م/ث. ما المسافة التي تقطعها في 5 ثوانٍ؟\n[ANSWER]\n100 | m',
-        },
-        mistake: 'استخدم الفاصل `|` بين القيمة الرقمية والوحدة. إذا لم تكن هناك وحدة، اكتب القيمة فقط.'
-    },
-    frq_ai: {
-        name: 'إجابة حرة (AI)',
-        icon: "M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
-        definition: 'مثل سؤال الإجابة الحرة، ولكنه مصمم ليتم تقييمه بواسطة الذكاء الاصطناعي باستخدام قالب تقييم محدد.',
-        structure: `type: frq_ai
-ai_template_id: 123456789012
-[STEM]
-اشرح مفهوم التكافل في علم الأحياء...
-[ANSWER]
-الإجابة النموذجية هنا...`,
-        examples: {
-            'أحياء': 'ai_template_id: 352108393701\n[STEM]\nصف عملية البناء الضوئي.\n[ANSWER]\nهي عملية تحويل الطاقة الضوئية إلى طاقة كيميائية...'
-        },
-        tip: 'يجب دائمًا تحديد `ai_template_id` لهذا النوع من الأسئلة. يمكن إضافته هنا أو عبر ميزة "Subject Template ID".'
-    },
-};
-
-const CodeBlock = ({ code }) => (
-    <pre className="bg-gray-800 text-white p-4 rounded-lg font-mono text-sm text-left direction-ltr whitespace-pre-wrap">
-        <code>{code}</code>
-    </pre>
-);
-
-const ProTip = ({ children, type = 'tip' }) => {
-    const baseClasses = "p-4 mt-6 rounded-lg";
-    const typeClasses = {
-        tip: "border-r-4 border-blue-500 bg-blue-50 text-blue-800",
-        mistake: "border-r-4 border-red-500 bg-red-50 text-red-800"
-    };
-    const title = type === 'tip' ? 'نصيحة احترافية' : 'خطأ شائع';
-
-    return (
-        <div className={`${baseClasses} ${typeClasses[type]}`}>
-            <p><strong className="font-bold">{title}:</strong> {children}</p>
+        <!-- Tabs Navigation -->
+        <div class="mb-8 bg-white p-2 rounded-xl shadow-md border border-slate-200">
+            <nav id="tabs" class="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                <!-- Tab buttons will be populated by JS -->
+            </nav>
         </div>
-    );
-};
 
-const WorkflowDiagram = () => (
-    <div className="my-12">
-        <h3 className="text-2xl font-bold text-center mb-8">مخطط سير العمل</h3>
-        <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0 text-center text-sm">
-            <div className="flex flex-col items-center p-2">
-                <div className="w-24 h-24 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full shadow-md">
-                    <Icon path="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" className="w-12 h-12 text-gray-500" strokeWidth="1" />
+        <!-- Tabs Content -->
+        <main id="tab-contents">
+            <!-- Guide Tab -->
+            <div id="guide" class="tab-content active space-y-8">
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="guide-title-1" class="text-3xl font-bold mb-6 text-purple-800 flex items-center gap-3"></h2>
+                    <div id="accordion-container" class="space-y-3"></div>
                 </div>
-                <span className="font-bold mt-2">1. نص خام</span>
-            </div>
-            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
-            <div className="flex flex-col items-center p-2">
-                <div className="w-24 h-24 flex items-center justify-center bg-purple-100 border-2 border-purple-300 rounded-full shadow-md">
-                    <Icon path="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" className="w-12 h-12 text-purple-600" strokeWidth="1" />
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="guide-title-2" class="text-3xl font-bold mb-6 text-purple-800 flex items-center gap-3"></h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead id="tags-table-head"></thead>
+                            <tbody id="tags-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
-                <span className="font-bold mt-2">2. تحسين بـ AI</span>
-                <span className="text-xs text-gray-500">(اختياري)</span>
             </div>
-            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
-            <div className="flex flex-col items-center p-2">
-                <div className="w-24 h-24 flex items-center justify-center bg-blue-100 border-2 border-blue-300 rounded-full shadow-md">
-                    <Icon path="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" className="w-12 h-12 text-blue-600" strokeWidth="1" />
+            
+            <!-- Workflow Tab -->
+            <div id="workflow" class="tab-content">
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="workflow-title" class="text-3xl font-bold mb-6 text-purple-800"></h2>
+                    <div class="space-y-8" id="workflow-container"></div>
                 </div>
-                <span className="font-bold mt-2">3. تحليل ذكي</span>
             </div>
-            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
-            <div className="flex flex-col items-center p-2">
-                <div className="w-24 h-24 flex items-center justify-center bg-yellow-100 border-2 border-yellow-400 rounded-full shadow-md">
-                    <Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className="w-12 h-12 text-yellow-600" strokeWidth="1" />
+
+             <!-- Advanced Tab -->
+            <div id="advanced" class="tab-content">
+                 <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="advanced-title" class="text-3xl font-bold mb-6 text-purple-800"></h2>
+                    <div class="space-y-4" id="advanced-accordion"></div>
                 </div>
-                <span className="font-bold mt-2">4. مراجعة وتعديل</span>
             </div>
-            <div className="text-gray-400 text-2xl font-light transform md:-translate-y-6 -rotate-90 md:rotate-0">→</div>
-            <div className="flex flex-col items-center p-2">
-                <div className="w-24 h-24 flex items-center justify-center bg-green-100 border-2 border-green-300 rounded-full shadow-md">
-                    <Icon path="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" className="w-12 h-12 text-green-600" strokeWidth="1" />
+
+            <!-- Prompts Tab -->
+            <div id="prompts" class="tab-content space-y-8">
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="prompts-title-1" class="text-3xl font-bold mb-2 text-purple-800"></h2>
+                    <p id="prompts-subtitle-1" class="mb-4 text-slate-600"></p>
+                    <div id="master-prompt-container"></div>
                 </div>
-                <span className="font-bold mt-2">5. تصدير</span>
-                <span className="text-xs text-gray-500">(JSON, ZIP, CSV)</span>
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="prompts-title-2" class="text-3xl font-bold mb-2 text-purple-800"></h2>
+                    <p id="prompts-subtitle-2" class="mb-4 text-slate-600"></p>
+                    <div class="grid md:grid-cols-2 gap-6" id="specific-prompts-container"></div>
+                </div>
             </div>
-        </div>
+
+            <!-- FAQ Tab -->
+            <div id="faq" class="tab-content">
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 id="faq-title" class="text-3xl font-bold mb-6 text-purple-800"></h2>
+                    <div class="space-y-4" id="faq-container"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center mt-12 text-slate-500">
+            <p id="footer-p1"></p>
+            <p id="footer-p2"></p>
+        </footer>
     </div>
-);
 
+    <script>
+        // --- DATA & TRANSLATIONS ---
 
-const App = () => {
-    const [activeTab, setActiveTab] = useState(Object.keys(questionTypesData)[0]);
+        // FIX: Define data constants globally before they are used.
+        const questionTypes = [
+            { id: 'mcq', name: '1. سؤال الاختيار من متعدد (MCQ)', desc: 'يُستخدم عندما يكون هناك إجابة صحيحة واحدة فقط من بين عدة خيارات.', format: 'type: mcq\n[STEM]\nنص السؤال...\n[CHOICES]\n* الإجابة الصحيحة\n- إجابة خاطئة', exampleSimple: 'type: mcq\n[STEM]\nفي أي قارة تقع مصر؟\n[CHOICES]\n- آسيا\n* أفريقيا\n- أوروبا', exampleLesson: 'type: mcq\n[STEM]\nما هي الصيغة العامة للدالة التربيعية؟\n[CHOICES]\n- f(x) = ax + b\n* f(x) = ax² + bx + c\n- f(x) = a/x' },
+            { id: 'mrq', name: '2. سؤال الإجابات المتعددة (MRQ)', desc: 'يُستخدم عندما يمكن أن يكون هناك أكثر من إجابة صحيحة واحدة.', format: 'type: mrq\n[STEM]\nنص السؤال...\n[CHOICES]\n* إجابة صحيحة 1\n- إجابة خاطئة\n* إجابة صحيحة 2', exampleSimple: 'type: mrq\n[STEM]\nاختر الفواكه:\n[CHOICES]\n* تفاح\n* موز\n- جزر', exampleLesson: 'type: mrq\n[STEM]\nما هي خصائص الدالة التربيعية؟\n[CHOICES]\n* لها قمة أو قاع\n- دائمًا تصاعدية\n* تتقاطع مع المحور y مرة واحدة' },
+            { id: 'matching', name: '3. سؤال التوصيل (Matching)', desc: 'يُستخدم للربط بين عناصر في مجموعتين.', format: 'type: matching\n[STEM]\nنص السؤال...\n[MATCHING_PAIRS]\nعنصر 1 | ارتباطه الصحيح', exampleSimple: 'type: matching\n[STEM]\nصل الحيوانات بأصواتها:\n[MATCHING_PAIRS]\nكلب | نباح\nقط | مواء', exampleLesson: 'type: matching\n[STEM]\nصل الدالة بوصفها:\n[MATCHING_PAIRS]\nf(x)=x² | تربيعية\nf(x)=2x | خطية' },
+            { id: 'gapText', name: '4. سؤال ملء الفراغات (Gap Text)', desc: 'يُستخدم لاختبار معرفة كلمات محددة داخل سياق.', format: 'type: gapText\n[STEM]\nالنص يحتوي على [BLANK]...\n[GAPS]\nالإجابة الصحيحة', exampleSimple: 'type: gapText\n[STEM]\nالشمس [BLANK] في السماء.\n[GAPS]\nتشرق', exampleLesson: 'type: gapText\n[STEM]\nالدالة f(x) = x² + [BLANK] x + 4 لها جذور [BLANK].\n[GAPS]\n4\nحقيقية ومتساوية' },
+            { id: 'oq', name: '5. سؤال الترتيب (Ordering)', desc: 'يُستخدم لترتيب مجموعة من العناصر وفقاً لمعيار معين.', format: 'type: oq\n[STEM]\nنص السؤال...\n[CHOICES]\n- العنصر الأول بالترتيب\n- العنصر الثاني بالترتيب', exampleSimple: 'type: oq\n[STEM]\nرتب الأرقام تصاعدياً:\n[CHOICES]\n- 1\n- 2\n- 3', exampleLesson: 'type: oq\n[STEM]\nرتب خطوات حل الدالة التربيعية:\n[CHOICES]\n- حساب المميز\n- حساب الجذور\n- رسم المنحنى' },
+            { id: 'string', name: '6. سؤال الإجابة النصية القصيرة (String)', desc: 'للأسئلة التي تتطلب إجابة قصيرة ومحددة جداً.', format: 'type: string\n[STEM]\nنص السؤال...\n[ANSWER]\nالإجابة الدقيقة', exampleSimple: 'type: string\n[STEM]\nما اسم كوكبنا؟\n[ANSWER]\nالأرض', exampleLesson: 'type: string\n[STEM]\nما هو معامل a في f(x)=3x²؟\n[ANSWER]\n3' },
+            { id: 'frq', name: '7. سؤال الإجابة الحرة (FRQ)', desc: 'للأسئلة المقالية التي تتطلب إجابة طويلة ومفصلة.', format: 'type: frq\n[STEM]\nنص السؤال...\n[ANSWER]\nالإجابة النموذجية', exampleSimple: 'type: frq\n[STEM]\nصف الطقس اليوم.\n[ANSWER]\nمشمس ودافئ.', exampleLesson: 'type: frq\n[STEM]\nاشرح كيف تحل معادلة ax²+bx+c=0.\n[ANSWER]\nاستخدم الصيغة x=[-b±sqrt(b²-4ac)]/(2a)' },
+            { id: 'frq_ai', name: '8. سؤال الإجابة الحرة بتصحيح AI (FRQ_AI)', desc: 'نفس FRQ، ولكنه مخصص للتصحيح التلقائي بواسطة AI.', format: 'type: frq_ai\nai_template_id: 123...\n[STEM]\nنص السؤال...\n[ANSWER]\nالإجابة النموذجية', exampleSimple: 'type: frq_ai\nai_template_id: 123\n[STEM]\nاكتب قصيدة.\n[ANSWER]\nالورد أحمر...', exampleLesson: 'type: frq_ai\nai_template_id: 456\n[STEM]\nحل المعادلة x²-4x+3=0 واشرح.\n[ANSWER]\n(x-1)(x-3)=0، جذور 1 و3.' },
+            { id: 'input_box', name: '9. سؤال إدخال الرقم (Input Box)', desc: 'للأسئلة التي تكون إجابتها رقماً محدداً، مع إمكانية تحديد وحدة.', format: 'type: input_box\n[STEM]\nنص السؤال...\n[ANSWER]\nالقيمة | الوحدة', exampleSimple: 'type: input_box\n[STEM]\nما سرعة السيارة؟\n[ANSWER]\n100 | كم/س', exampleLesson: 'type: input_box\n[STEM]\nما تسارع الجاذبية؟\n[ANSWER]\n9.8 | م/ث²' },
+            { id: 'multipart', name: '10. الأسئلة متعددة الأجزاء (Multi-part)', desc: 'هيكل لتجميع عدة أسئلة تحت مقدمة واحدة.', format: '[STATEMENT]\nالمقدمة المشتركة...\n\n[PART]\ntype: mcq\n[STEM]\nالسؤال الأول...\n\n[PART]\ntype: string\n[STEM]\nالسؤال الثاني...', exampleSimple: '', exampleLesson: '' }
+        ];
 
-    const renderTabContent = () => {
-        const type = questionTypesData[activeTab];
-        if (!type) return null;
+        const tags = [
+            { tag: '`[STEM]`', desc: 'يحتوي على نص السؤال الرئيسي.', example: '`[STEM]\nما هي صيغة حساب السرعة؟`' },
+            { tag: '`[CHOICES]`', desc: 'يحتوي على قائمة الاختيارات.', example: '`[CHOICES]\n* v = d/t\n- v = d*t`' },
+            { tag: '`[ANSWER]`', desc: 'يحتوي على الإجابة لأسئلة `String`, `FRQ`, و `Input Box`.', example: '`[ANSWER]\n9.8 | m/s²`' },
+            { tag: '`[GAPS]`', desc: 'يحتوي على إجابات الفراغات بالترتيب، كل إجابة في سطر.', example: '`[GAPS]\nالتسارع\n9.8`' },
+            { tag: '`[MATCHING_PAIRS]`', desc: 'يحتوي على أزواج التوصيل، مفصولة بـ `|`.', example: '`[MATCHING_PAIRS]\nنيوتن | القوة`' },
+            { tag: '`[BLANK]`', desc: 'يمثل فراغاً داخل نص السؤال ليتم ملؤه.', example: '`القوة = الكتلة × [BLANK].`' },
+            { tag: '`[STATEMENT]`', desc: 'يحتوي على المقدمة لسؤال متعدد الأجزاء.', example: '`[STATEMENT]\nبالنظر إلى قوانين الحركة...`' },
+            { tag: '`[PART]`', desc: 'يعمل كفاصل بين أجزاء السؤال متعدد الأجزاء.', example: '`[PART]\ntype: mcq\n...`' },
+            { tag: '`[U]...[/U]`', desc: 'يستخدم لوضع خط تحت النص للتأكيد.', example: '`[U]التسارع هو 9.8 م/ث²[/U]`' },
+            { tag: '`---`', desc: '**فاصل إلزامي** بين كل سؤال والآخر.', example: '`---` (يوضع بعد كل سؤال مكتمل).' }
+        ];
 
-        return (
-            <div className="p-5 bg-white rounded-b-lg rounded-tl-lg border border-gray-200 shadow-inner">
-                <p className="text-lg text-gray-700">{type.definition}</p>
-                <h4 className="text-xl font-bold mt-6 mb-2">البنية الأساسية:</h4>
-                <CodeBlock code={type.structure} />
-                <h4 className="text-xl font-bold mt-6">أمثلة عملية:</h4>
-                {Object.entries(type.examples).map(([subject, exampleCode]) => (
-                    <div key={subject}>
-                        <h5 className="font-semibold mt-4">{subject}:</h5>
-                        <CodeBlock code={exampleCode.startsWith('ai_template_id') ? exampleCode : `[STEM]\n${exampleCode}`} />
+        const specificPrompts = [
+            { title: '1. لتحويل سؤال اختيار من متعدد (MCQ)', code: 'You are a formatting expert. Convert the following raw text into a standard MCQ format.\n- The format must start with `type: mcq`.\n- Use `[STEM]` for the question.\n- Use `[CHOICES]` for the options.\n- The single correct option must start with `*`.\n- All other incorrect options must start with `-`.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! الصق هنا سؤال الـ MCQ الخام !!]\n\nFORMATTED TEXT:' },
+            { title: '2. لتحويل سؤال ملء الفراغات (GapText)', code: 'You are a formatting expert. Convert the following raw text into a standard GapText format.\n- The format must start with `type: gapText`.\n- In the `[STEM]`, replace any long dash or underscore sequences (e.g., `ــــــــــــ` or `____`) with the `[BLANK]` tag.\n- List the correct answers in order under the `[GAPS]` tag, each on a new line.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! الصق هنا سؤال ملء الفراغات الخام !!]\n\nFORMATTED TEXT:' },
+            { title: '3. لتحويل سؤال توصيل (Matching)', code: 'You are a formatting expert. Convert the following raw text into a standard Matching format.\n- The format must start with `type: matching`.\n- Use `[STEM]` for the instruction.\n- Place the correctly matched pairs under `[MATCHING_PAIRS]`.\n- Each pair must be on a new line, separated by a `|` character.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! الصق هنا سؤال التوصيل الخام !!]\n\nFORMATTED TEXT:' },
+            { title: '4. لتحويل سؤال ترتيب (OQ)', code: 'You are a formatting expert. Convert the following raw text into a standard Ordering Question (OQ) format.\n- The format must start with `type: oq`.\n- Use `[STEM]` for the instruction.\n- Under `[CHOICES]`, list all items IN THE CORRECT ORDER.\n- Each item in the list must be prefixed with `-`.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! الصق هنا سؤال الترتيب الخام !!]\n\nFORMATTED TEXT:' }
+        ];
+
+        const workflowSteps = [
+            { title: 'السيناريو الأول: الطريقة القياسية (الأدق)', icon: '🎯', content: 'هي الطريقة الموصى بها وتضمن نتائج 100% صحيحة. تعتمد على كتابة السؤال باستخدام "وسوم" (Tags) بسيطة ومحددة مثل `type: mcq`, `[STEM]`, `[CHOICES]`, واستخدام `---` للفصل بين الأسئلة. بعد الكتابة، اضغط "تحليل ذكي" للمعاينة، ثم "تحويل لـ JSON" للنتيجة النهائية.' },
+            { title: 'السيناريو الثاني: التعامل مع النصوص الجاهزة (بمساعدة AI)', icon: '✨', content: 'إذا كان لديك نص غير منظم (مثل نص من ملف Word)، الصقه في المحرر واضغط على زر "💎 تحسين بالـ AI". سيقوم الذكاء الاصطناعي بإعادة هيكلة النص بالتنسيق القياسي، وبعدها يمكنك المتابعة بالضغط على "تحليل ذكي". (هذه الميزة تتطلب مفتاح API).' },
+            { title: 'السيناريو الثالث: توليد أسئلة من العدم', icon: '🚀', content: 'إذا كان لديك محتوى (مثل فقرة من درس) وتريد إنشاء أسئلة عنه، اضغط "🚀 توليد أسئلة". في النافذة الجديدة، الصق النص أو ارفع صورة، ثم حدد عدد ونوع الأسئلة المطلوبة. سيقوم الذكاء الاصطناعي بإنشاء الأسئلة وإضافتها للمحرر. (هذه الميزة تتطلب مفتاح API).' }
+        ];
+
+        const faqs = [
+            { q: 'أزرار الذكاء الاصطناعي لا تعمل أو تعطي خطأ.', a: '99% من الوقت، المشكلة تكون في مفتاح الـ API. تأكد من أنك قمت بلصقه بشكل صحيح في الخانة المخصصة، وأنه لا توجد مسافات إضافية في البداية أو النهاية.' },
+            { q: '"التحليل الذكي" يعطي نتائج غريبة أو خاطئة.', a: 'تحقق من النص الأصلي. هل نسيت وضع الفاصل `---` بين الأسئلة؟ هل هناك خطأ إملائي في أحد الوسوم (مثلاً `[STME]` بدلاً من `[STEM]`)؟' },
+            { q: 'لا يظهر شيء عند الضغط على "تحويل لـ JSON".', a: 'تأكد من أنك قمت بالضغط على "تحليل ذكي" أولاً وأن لوحة المعاينة تعرض الأسئلة بشكل صحيح. الأداة لن تحول شيئاً لم يتم تحليله ومراجعته أولاً. ابحث عن علامة التحذير (⚠️) في المعاينة.' },
+            { q: 'ما هو أفضل خيار لتصدير عدة أسئلة؟', a: 'استخدم دائماً زر "🗜️ تحميل كـ ZIP". هذا الخيار يقوم بتحميل ملف مضغوط يحتوي على كل سؤال في ملف .json منفصل بالإضافة إلى ملف CSV يلخصهم، وهو الخيار الأنسب للعمل المجمع.' }
+        ];
+
+        const advancedTopics = [
+            { title: '"تحت الغطاء": كيف تعمل الأداة؟', content: 'تعمل الأداة عبر عدة مراحل: <strong>1. التقسيم:</strong> يتم تقسيم النص الكامل إلى كتل أسئلة منفصلة باستخدام الفاصل `---`. <strong>2. التحليل (Parsing):</strong> تستخدم الأداة تعابير نمطية (Regex) للتعرف على الوسوم مثل `type:` و `[STEM]` واستخلاص المحتوى الخاص بكل جزء. <strong>3. إدارة الحالة:</strong> يتم تخزين الأسئلة المحللة في الذاكرة (كائن JavaScript)، مما يسمح بتحديث المعاينة بشكل فوري. <strong>4. التحويل إلى JSON:</strong> عند الضغط على زر التحويل، لا يتم فقط تنسيق النص، بل يتم تحويل البيانات المخزنة إلى هيكل JSON النهائي المطلوب للنظام، مع إضافة بيانات وصفية (metadata) مثل اللغة والدولة.'},
+            { title: 'نصائح للمحترفين وأسرار الإنتاجية', content: '<ul><li class="mb-2"><strong>التحرير المباشر:</strong> في المعاينة، يمكنك النقر مباشرة على أي اختيار في أسئلة MCQ/MRQ لتغيير الإجابة الصحيحة بدون تعديل النص يدوياً.</li><li class="mb-2"><strong>التعديل المجمع بـ CSV:</strong> محرر CSV هو أسرع طريقة لتعيين `Lesson ID` أو `Question ID` لعشرات الأسئلة دفعة واحدة.</li><li class="mb-2"><strong>الحفظ التلقائي:</strong> يتم حفظ عملك في `localStorage` بالمتصفح، لذا عملك آمن إذا أغلقت الصفحة، لكنه يقتصر على هذا المتصفح وهذا الجهاز فقط.</li><li class="mb-2"><strong>اختصار الإغلاق:</strong> استخدم مفتاح `Esc` لإغلاق أي نافذة منبثقة (modal) فوراً.</li></ul>'},
+            { title: 'دليل التعامل مع المعادلات (LaTeX)', content: 'الأداة تستخدم مكتبة MathLive لعرض وتعديل المعادلات. <strong>الفرق الأساسي:</strong> استخدم backticks فردية (` `) للمعادلات السطرية (inline) التي تظهر وسط النص، واستخدم backticks مزدوجة (`` ``) للمعادلات الكبيرة التي تظهر في سطر منفصل (display). يمكنك النقر على أي معادلة في المعاينة لفتح محرر مرئي سهل الاستخدام.'},
+            { title: 'شرح آلية التحقق من الصحة (Validation)', content: 'أيقونة التحذير (⚠️) تظهر عندما تكتشف الأداة خطأ منطقياً في سؤالك. يتم هذا عبر فحص فوري للنص. <strong>أشهر الأخطاء التي يتم كشفها:</strong> سؤال MCQ بدون أي إجابة صحيحة (*)، أو سؤال توصيل (Matching) يحتوي على سطر لا يفصل بينه الرمز `|`. هذه الميزة تساعد على منع الأخطاء قبل تصدير الملف النهائي.'},
+            { title: 'هيكل ملف الـ ZIP المُصدَّر', content: 'عند استخدام خيار "تحميل كـ ZIP"، ستحصل على ملف مضغوط يحتوي على: <br><strong>1. مجلد `JSONS`:</strong> بداخله كل سؤال كملف `.json` منفصل، ومسمى بالـ ID الخاص به. <br><strong>2. ملف `question_set_summary.csv`:</strong> جدول بيانات يلخص كل الأسئلة وبياناتها الوصفية في مكان واحد لتسهيل المراجعة.'}
+        ];
+
+        const translations = {
+            ar: {
+                mainTitle: "🚀 الدليل التفاعلي الكامل لمحول الأسئلة الذكي",
+                mainSubtitle: "مرجعك الشامل لإتقان الأداة، من فهم أنواع الأسئلة واستخدام الوسوم، إلى توليد التنسيقات باستخدام البرومبتات الاحترافية.",
+                langSwitcher: "English",
+                tabs: [
+                    { id: 'guide', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18" /></svg>', text: 'الأنواع والوسوم' },
+                    { id: 'workflow', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>', text: 'خطوات الاستخدام' },
+                    { id: 'advanced', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 010 1.414L10 12l4.293 4.293a1 1 0 010 1.414L12 20m2.293-14l2.293 2.293a1 1 0 000 1.414L14 12l2.293 2.293a1 1 0 000 1.414L14 20" /></svg>', text: 'ميزات متقدمة' },
+                    { id: 'prompts', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>', text: 'البرومبتات' },
+                    { id: 'faq', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>', text: 'أسئلة شائعة' }
+                ],
+                guideTitle1: '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>أنواع الأسئلة المدعومة',
+                guideTitle2: '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 8v5a2 2 0 002 2h.01" /></svg>مرجع الوسوم (Tags) الكامل',
+                tagsTableHeader: ['الوسم', 'الوصف', 'مثال من درس (فيزياء: "الحركة")'],
+                workflowTitle: "خطوات الاستخدام وسيناريوهات العمل",
+                advancedTitle: "ميزات متقدمة وتفاصيل تقنية",
+                promptsTitle1: "الـ Prompt الرئيسي الشامل (Master Prompt)",
+                promptsSubtitle1: "الأقوى والأكثر مرونة. استخدمه لتحويل دفعة من الأسئلة المختلطة من أنواع مختلفة في مرة واحدة.",
+                promptsTitle2: "Prompts مخصصة لكل نوع",
+                promptsSubtitle2: "استخدم هذه الأوامر المخصصة إذا كنت تريد تحويل مجموعة من الأسئلة من نوع واحد فقط لنتائج أكثر دقة.",
+                faqTitle: "أسئلة شائعة وحل المشكلات",
+                footerP1: "تم تصميم هذا الدليل لتسهيل استخدام \"محول الأسئلة الذكي\".",
+                footerP2: "© 2025 - بالتوفيق في عملكم!",
+                copyBtnText: "نسخ",
+                copiedBtnText: "تم النسخ!",
+                exampleSimple: "مثال بسيط:",
+                exampleLesson: "مثال من درس:",
+                noExample: "لا يوجد مثال تطبيقي لهذا الهيكل",
+                questionTypes: questionTypes.map(q => ({...q})),
+                tags: tags,
+                workflowSteps: workflowSteps,
+                faqs: faqs,
+                advancedTopics: advancedTopics,
+                masterPrompt: `You are an expert academic content formatter. Your task is to meticulously convert raw, unstructured question text into a standardized, tagged format.
+
+**Core Instructions:**
+1.  **Detect every question** in the provided text.
+2.  **Auto-detect the question type** for each question from the following list: \`mcq\`, \`mrq\`, \`matching\`, \`gapText\`, \`oq\`, \`string\`, \`frq\`, \`frq_ai\`, \`input_box\`.
+3.  **Format EACH question** according to the strict rules below.
+4.  **Separate each complete question block** with \`---\`.
+
+**Formatting Rules by Question Type:**
+* **For MCQ/MRQ:**
+    * Start with \`type: mcq\` or \`type: mrq\`.
+    * Use \`[STEM]\` for the question text.
+    * Use \`[CHOICES]\` for the options.
+    * Prefix the single correct answer with \`*\` for MCQ.
+    * Prefix ALL correct answers with \`*\` for MRQ.
+    * Prefix all incorrect answers with \`-\`.
+* **For Matching:**
+    * Start with \`type: matching\`.
+    * Use \`[STEM]\` for the instruction.
+    * Use \`[MATCHING_PAIRS]\` for the pairs.
+    * Separate each pair with a \`|\` character (e.g., \`Term | Definition\`).
+* **For GapText:**
+    * Start with \`type: gapText\`.
+    * In the \`[STEM]\`, find any long underscore/dash sequences (like \`____\` or \`ــــــــــــ\`) and **replace them with the \`[BLANK]\` tag**.
+    * List the correct answers in order under \`[GAPS]\`, each on a new line.
+* **For Ordering (OQ):**
+    * Start with \`type: oq\`.
+    * Use \`[STEM]\` for the instruction.
+    * Under \`[CHOICES]\`, list the items **in the correct order**, each prefixed with \`-\`.
+* **For String/FRQ/FRQ_AI:**
+    * Start with the appropriate type (\`type: string\`, etc.).
+    * Use \`[STEM]\` for the question.
+    * Place the model answer under \`[ANSWER]\`.
+* **For Input Box:**
+    * Start with \`type: input_box\`.
+    * Use \`[STEM]\` for the question.
+    * Under \`[ANSWER]\`, provide the value, followed by \`|\`, then the unit (e.g., \`9.8 | m/s²\`).
+
+**Input Text to Convert:**
+\`\`\`
+[!! الصق هنا نص الأسئلة الخام !!]
+\`\`\`
+
+**Formatted Output:**
+`,
+                specificPrompts: specificPrompts
+            },
+            en: {
+                mainTitle: "🚀 The Complete Interactive Guide for the Smart Question Converter",
+                mainSubtitle: "Your comprehensive reference for mastering the tool, from understanding question types and tags to generating formats using professional prompts.",
+                langSwitcher: "العربية",
+                tabs: [
+                    { id: 'guide', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18" /></svg>', text: 'Types & Tags' },
+                    { id: 'workflow', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>', text: 'Workflow' },
+                    { id: 'advanced', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 010 1.414L10 12l4.293 4.293a1 1 0 010 1.414L12 20m2.293-14l2.293 2.293a1 1 0 000 1.414L14 12l2.293 2.293a1 1 0 000 1.414L14 20" /></svg>', text: 'Advanced Features' },
+                    { id: 'prompts', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>', text: 'Prompts' },
+                    { id: 'faq', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>', text: 'FAQ' }
+                ],
+                guideTitle1: '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>Supported Question Types',
+                guideTitle2: '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 8v5a2 2 0 002 2h.01" /></svg>Complete Tags Reference',
+                tagsTableHeader: ['Tag', 'Description', 'Example from Physics: "Motion"'],
+                workflowTitle: "Workflow and Usage Scenarios",
+                advancedTitle: "Advanced Features & Technical Details",
+                promptsTitle1: "Master Prompt",
+                promptsSubtitle1: "The most powerful and flexible prompt. Use it to convert a mixed batch of questions of different types at once.",
+                promptsTitle2: "Specific Prompts for Each Type",
+                promptsSubtitle2: "Use these custom prompts if you want to convert a set of questions of a single type for more accurate results.",
+                faqTitle: "Frequently Asked Questions & Troubleshooting",
+                footerP1: "This guide was designed to facilitate the use of the \"Smart Question Converter\".",
+                footerP2: "© 2025 - Good luck with your work!",
+                copyBtnText: "Copy",
+                copiedBtnText: "Copied!",
+                exampleSimple: "Simple Example:",
+                exampleLesson: "Lesson Example:",
+                noExample: "No practical example for this structure",
+                questionTypes: [
+                     { id: 'mcq', name: '1. Multiple Choice Question (MCQ)', desc: 'Used when there is only one correct answer among several options.', exampleLesson: 'type: mcq\n[STEM]\nWhat is the general form of a quadratic function?\n[CHOICES]\n- f(x) = ax + b\n* f(x) = ax² + bx + c\n- f(x) = a/x' },
+                     { id: 'mrq', name: '2. Multiple Response Question (MRQ)', desc: 'Used when there can be more than one correct answer.', exampleLesson: 'type: mrq\n[STEM]\nWhat are the properties of a quadratic function?\n[CHOICES]\n* It has a vertex (a peak or a valley)\n- It is always increasing\n* It intersects the y-axis once' },
+                     { id: 'matching', name: '3. Matching Question', desc: 'Used to link items from two groups.', exampleLesson: 'type: matching\n[STEM]\nMatch the function to its description:\n[MATCHING_PAIRS]\nf(x)=x² | Quadratic\nf(x)=2x | Linear' },
+                     { id: 'gapText', name: '4. Gapped Text Question', desc: 'Used to test knowledge of specific words within a context.', exampleLesson: 'type: gapText\n[STEM]\nThe function f(x) = x² + [BLANK]x + 4 has [BLANK] roots.\n[GAPS]\n4\nreal and equal' },
+                     { id: 'oq', name: '5. Ordering Question', desc: 'Used to arrange a set of items according to a specific criterion.', exampleLesson: 'type: oq\n[STEM]\nOrder the steps to solve a quadratic function:\n[CHOICES]\n- Calculate the discriminant\n- Calculate the roots using the formula\n- Draw the graph' },
+                     { id: 'string', name: '6. String Question', desc: 'For questions requiring a short, very specific answer.', exampleLesson: 'type: string\n[STEM]\nWhat is the coefficient of a in f(x)=3x²?\n[ANSWER]\n3' },
+                     { id: 'frq', name: '7. Free Response Question (FRQ)', desc: 'For essay questions requiring a long, detailed answer.', exampleLesson: 'type: frq\n[STEM]\nExplain how to solve ax²+bx+c=0.\n[ANSWER]\nUse the formula x=[-b±sqrt(b²-4ac)]/(2a)' },
+                     { id: 'frq_ai', name: '8. AI-Graded Free Response (FRQ_AI)', desc: 'Same as FRQ, but intended for automatic grading by an AI.', exampleLesson: 'type: frq_ai\nai_template_id: 456\n[STEM]\nSolve the equation x²-4x+3=0 and explain.\n[ANSWER]\n(x-1)(x-3)=0, roots are 1 and 3.' },
+                     { id: 'input_box', name: '9. Input Box Question', desc: 'For questions whose answer is a specific number, with an optional unit.', exampleLesson: 'type: input_box\n[STEM]\nWhat is the acceleration of gravity?\n[ANSWER]\n9.8 | m/s²' },
+                     { id: 'multipart', name: '10. Multi-part Questions', desc: 'A structure to group several questions under a single introduction.' }
+                ].map(en_q => ({...questionTypes.find(q => q.id === en_q.id), ...en_q})),
+                tags: [
+                    { tag: '`[STEM]`', desc: 'Contains the main text of the question.', example: '`[STEM]\nWhat is the formula for velocity?`' },
+                    { tag: '`[CHOICES]`', desc: 'Contains the list of options.', example: '`[CHOICES]\n* v = d/t\n- v = d*t`' },
+                    { tag: '`[ANSWER]`', desc: 'Contains the answer for `String`, `FRQ`, and `Input Box` questions.', example: '`[ANSWER]\n9.8 | m/s²`' },
+                    { tag: '`[GAPS]`', desc: 'Contains the gap-fill answers in order, each on a new line.', example: '`[GAPS]\nAcceleration\n9.8`' },
+                    { tag: '`[MATCHING_PAIRS]`', desc: 'Contains the matching pairs, separated by `|`.', example: '`[MATCHING_PAIRS]\nNewton | Force`' },
+                    { tag: '`[BLANK]`', desc: 'Represents a blank space within the question text to be filled.', example: '`Force = mass × [BLANK].`' },
+                    { tag: '`[STATEMENT]`', desc: 'Contains the introduction for a multi-part question.', example: '`[STATEMENT]\nConsidering the laws of motion...`' },
+                    { tag: '`[PART]`', desc: 'Acts as a separator between parts of a multi-part question.', example: '`[PART]\ntype: mcq\n...`' },
+                    { tag: '`[U]...[/U]`', desc: 'Used to underline text for emphasis.', example: '`[U]Acceleration is 9.8 m/s²[/U]`' },
+                    { tag: '`---`', desc: '**Mandatory separator** between each question.', example: '`---` (placed after each complete question).' }
+                ],
+                workflowSteps: [
+                    { title: 'Scenario 1: The Standard Method (Most Accurate)', icon: '�', content: 'This is the recommended method and guarantees 100% correct results. It relies on writing the question using simple, specific "Tags" like `type: mcq`, `[STEM]`, `[CHOICES]`, and using `---` to separate questions. After writing, click "Smart Analyze" to preview, then "Convert to JSON" for the final result.' },
+                    { title: 'Scenario 2: Handling Raw Text (with AI Assistance)', icon: '✨', content: 'If you have unstructured text (e.g., from a Word file), paste it into the editor and click the "💎 Enhance with AI" button. The AI will restructure the text into the standard format, after which you can proceed by clicking "Smart Analyze". (This feature requires an API key).' },
+                    { title: 'Scenario 3: Generating Questions from Scratch', icon: '🚀', content: 'If you have content (like a lesson paragraph) and want to create questions from it, click "🚀 Generate Questions". In the new window, paste the text or upload an image, then specify the number and type of questions desired. The AI will generate the questions and add them to the editor. (This feature requires an API key).' }
+                ],
+                faqs: [
+                    { q: 'The AI buttons are not working or give an error.', a: '99% of the time, the issue is with the API key. Ensure you have pasted it correctly in the designated field and that there are no extra spaces at the beginning or end.' },
+                    { q: '"Smart Analyze" gives strange or incorrect results.', a: 'Check the original text. Did you forget to put the `---` separator between questions? Is there a typo in one of the tags (e.g., `[STME]` instead of `[STEM]`)?' },
+                    { q: 'Nothing appears when I click "Convert to JSON".', a: 'Make sure you have clicked "Smart Analyze" first and that the preview pane is displaying the questions correctly. The tool will not convert anything that has not been analyzed and reviewed first. Look for the warning icon (⚠️) in the preview.' },
+                    { q: 'What is the best option for exporting multiple questions?', a: 'Always use the "🗜️ Download as ZIP" button. This option downloads a compressed file containing each question as a separate .json file, plus a summary CSV file, which is the most suitable option for bulk work.' }
+                ],
+                advancedTopics: [
+                    { title: '"Under the Hood": How Does the Tool Work?', content: 'The tool operates in several stages: <strong>1. Splitting:</strong> The full text is divided into separate question blocks using the `---` separator. <strong>2. Parsing:</strong> The tool uses regular expressions (Regex) to identify tags like `type:` and `[STEM]` and extract the content for each part. <strong>3. State Management:</strong> The parsed questions are stored in memory (as a JavaScript object), allowing for instant preview updates. <strong>4. JSON Conversion:</strong> When you click the convert button, the stored data is transformed into the final JSON structure required by the system, adding metadata like language and country.'},
+                    { title: 'Pro Tips & Productivity Secrets', content: '<ul><li class="mb-2"><strong>Direct Editing:</strong> In the preview, you can click directly on any choice in MCQ/MRQ questions to change the correct answer without manually editing the text.</li><li class="mb-2"><strong>Bulk Editing with CSV:</strong> The CSV editor is the fastest way to assign a `Lesson ID` or `Question ID` to dozens of questions at once.</li><li class="mb-2"><strong>Auto-Save:</strong> Your work is automatically saved in the browser\'s `localStorage`, so it\'s safe if you close the page, but it\'s limited to that browser and device only.</li><li class="mb-2"><strong>Closing Shortcut:</strong> Use the `Esc` key to instantly close any pop-up window (modal).</li></ul>'},
+                    { title: 'Guide to Handling Equations (LaTeX)', content: 'The tool uses the MathLive library to display and edit equations. <strong>The key difference:</strong> Use single backticks (` `) for inline equations that appear within the text, and use double backticks (`` ``) for larger equations that appear on their own line (display). You can click on any equation in the preview to open an easy-to-use visual editor.'},
+                    { title: 'How Validation Works', content: 'The warning icon (⚠️) appears when the tool detects a logical error in your question. This is done via an instant text check. <strong>The most common detected errors:</strong> An MCQ question with no correct answer (*), or a Matching question with a line not separated by the `|` symbol. This feature helps prevent errors before exporting the final file.'},
+                    { title: 'Structure of the Exported ZIP File', content: 'When using the "Download as ZIP" option, you will get a compressed file containing: <br><strong>1. `JSONS` folder:</strong> Inside, each question is a separate `.json` file, named with its ID. <br><strong>2. `question_set_summary.csv` file:</strong> A spreadsheet that summarizes all questions and their metadata in one place for easy review.'}
+                ],
+                masterPrompt: `You are an expert academic content formatter. Your task is to meticulously convert raw, unstructured question text into a standardized, tagged format.
+
+**Core Instructions:**
+1.  **Detect every question** in the provided text.
+2.  **Auto-detect the question type** for each question from the following list: \`mcq\`, \`mrq\`, \`matching\`, \`gapText\`, \`oq\`, \`string\`, \`frq\`, \`frq_ai\`, \`input_box\`.
+3.  **Format EACH question** according to the strict rules below.
+4.  **Separate each complete question block** with \`---\`.
+
+**Formatting Rules by Question Type:**
+* **For MCQ/MRQ:**
+    * Start with \`type: mcq\` or \`type: mrq\`.
+    * Use \`[STEM]\` for the question text.
+    * Use \`[CHOICES]\` for the options.
+    * Prefix the single correct answer with \`*\` for MCQ.
+    * Prefix ALL correct answers with \`*\` for MRQ.
+    * Prefix all incorrect answers with \`-\`.
+* **For Matching:**
+    * Start with \`type: matching\`.
+    * Use \`[STEM]\` for the instruction.
+    * Use \`[MATCHING_PAIRS]\` for the pairs.
+    * Separate each pair with a \`|\` character (e.g., \`Term | Definition\`).
+* **For GapText:**
+    * Start with \`type: gapText\`.
+    * In the \`[STEM]\`, find any long underscore/dash sequences (like \`____\` or \`ــــــــــــ\`) and **replace them with the \`[BLANK]\` tag**.
+    * List the correct answers in order under \`[GAPS]\`, each on a new line.
+* **For Ordering (OQ):**
+    * Start with \`type: oq\`.
+    * Use \`[STEM]\` for the instruction.
+    * Under \`[CHOICES]\`, list the items **in the correct order**, each prefixed with \`-\`.
+* **For String/FRQ/FRQ_AI:**
+    * Start with the appropriate type (\`type: string\`, etc.).
+    * Use \`[STEM]\` for the question.
+    * Place the model answer under \`[ANSWER]\`.
+* **For Input Box:**
+    * Start with \`type: input_box\`.
+    * Use \`[STEM]\` for the question.
+    * Under \`[ANSWER]\`, provide the value, followed by \`|\`, then the unit (e.g., \`9.8 | m/s²\`).
+
+**Input Text to Convert:**
+\`\`\`
+[!! Paste raw question text here !!]
+\`\`\`
+
+**Formatted Output:**
+`,
+                specificPrompts: [
+                    { title: '1. To convert an MCQ question', code: 'You are a formatting expert. Convert the following raw text into a standard MCQ format.\n- The format must start with `type: mcq`.\n- Use `[STEM]` for the question.\n- Use `[CHOICES]` for the options.\n- The single correct option must start with `*`.\n- All other incorrect options must start with `-`.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! Paste the raw MCQ question here !!]\n\nFORMATTED TEXT:' },
+                    { title: '2. To convert a GapText question', code: 'You are a formatting expert. Convert the following raw text into a standard GapText format.\n- The format must start with `type: gapText`.\n- In the `[STEM]`, replace any long dash or underscore sequences (e.g., `ــــــــــــ` or `____`) with the `[BLANK]` tag.\n- List the correct answers in order under the `[GAPS]` tag, each on a new line.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! Paste the raw GapText question here !!]\n\nFORMATTED TEXT:' },
+                    { title: '3. To convert a Matching question', code: 'You are a formatting expert. Convert the following raw text into a standard Matching format.\n- The format must start with `type: matching`.\n- Use `[STEM]` for the instruction.\n- Place the correctly matched pairs under `[MATCHING_PAIRS]`.\n- Each pair must be on a new line, separated by a `|` character.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! Paste the raw Matching question here !!]\n\nFORMATTED TEXT:' },
+                    { title: '4. To convert an Ordering question (OQ)', code: 'You are a formatting expert. Convert the following raw text into a standard Ordering Question (OQ) format.\n- The format must start with `type: oq`.\n- Use `[STEM]` for the instruction.\n- Under `[CHOICES]`, list all items IN THE CORRECT ORDER.\n- Each item in the list must be prefixed with `-`.\n- Separate the final formatted block with `---`.\n\nRAW TEXT:\n[!! Paste the raw Ordering question here !!]\n\nFORMATTED TEXT:' }
+                ]
+            }
+        };
+        
+        let currentLang = 'ar';
+
+        function renderContent(lang) {
+            const T = translations[lang];
+            
+            // Set document lang and dir
+            document.documentElement.lang = lang;
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+            // Update static text
+            document.getElementById('main-title').textContent = T.mainTitle;
+            document.getElementById('main-subtitle').textContent = T.mainSubtitle;
+            document.getElementById('lang-switcher').textContent = T.langSwitcher;
+            document.getElementById('guide-title-1').innerHTML = T.guideTitle1;
+            document.getElementById('guide-title-2').innerHTML = T.guideTitle2;
+            document.getElementById('workflow-title').textContent = T.workflowTitle;
+            document.getElementById('advanced-title').textContent = T.advancedTitle;
+            document.getElementById('prompts-title-1').textContent = T.promptsTitle1;
+            document.getElementById('prompts-subtitle-1').textContent = T.promptsSubtitle1;
+            document.getElementById('prompts-title-2').textContent = T.promptsTitle2;
+            document.getElementById('prompts-subtitle-2').textContent = T.promptsSubtitle2;
+            document.getElementById('faq-title').textContent = T.faqTitle;
+            document.getElementById('footer-p1').textContent = T.footerP1;
+            document.getElementById('footer-p2').textContent = T.footerP2;
+
+            // Render tabs
+            const tabsContainer = document.getElementById('tabs');
+            tabsContainer.innerHTML = '';
+            T.tabs.forEach((tab, index) => {
+                const button = document.createElement('button');
+                button.dataset.tab = tab.id;
+                button.className = `tab-btn flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent transition-all duration-300 ${index === 0 ? 'active' : ''}`;
+                button.innerHTML = `${tab.icon}<span>${tab.text}</span>`;
+                tabsContainer.appendChild(button);
+            });
+            
+            // Re-attach tab listener
+            tabsContainer.addEventListener('click', handleTabClick);
+            
+            // Render accordion
+            const accordionContainer = document.getElementById('accordion-container');
+            accordionContainer.innerHTML = '';
+            T.questionTypes.forEach(q => {
+                 const item = document.createElement('div');
+                item.className = 'border border-slate-200 rounded-lg overflow-hidden';
+                item.innerHTML = `
+                    <button class="accordion-header w-full text-right p-4 bg-slate-50 hover:bg-slate-100 flex justify-between items-center transition">
+                        <span class="font-bold text-lg text-slate-700">${q.name}</span>
+                        <svg class="accordion-icon w-6 h-6 text-purple-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="accordion-content bg-white p-4 border-t border-slate-200" style="display: none;">
+                        <p class="text-slate-600 mb-4">${q.desc}</p>
+                        <div class="grid md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <h4 class="font-semibold mb-2 text-purple-700">${T.exampleSimple}</h4>
+                                <pre class="bg-slate-100 p-3 rounded-md text-slate-800 whitespace-pre-wrap"><code>${q.exampleSimple || T.noExample}</code></pre>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2 text-purple-700">${T.exampleLesson}</h4>
+                                <pre class="bg-slate-100 p-3 rounded-md text-slate-800 whitespace-pre-wrap"><code>${q.exampleLesson || T.noExample}</code></pre>
+                            </div>
+                        </div>
                     </div>
-                ))}
-                <ProTip type={type.mistake ? 'mistake' : 'tip'}>
-                    {type.tip || type.mistake}
-                </ProTip>
-            </div>
-        );
-    };
+                `;
+                accordionContainer.appendChild(item);
+            });
 
-    return (
-        <div className="antialiased bg-gray-50 text-gray-800" style={{ fontFamily: "'Tajawal', sans-serif" }}>
-            <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <header className="text-center mb-12">
-                    <div className="inline-block bg-indigo-100 text-indigo-700 p-4 rounded-2xl shadow-md mb-4">
-                        <Icon path="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0V5.625m0 0H10.5m2.25-2.25H15M10.5 12.75a2.25 2.25 0 1 1 4.5 0 2.25 2.25 0 0 1-4.5 0Zm-4.5 4.5a2.25 2.25 0 1 1 4.5 0 2.25 2.25 0 0 1-4.5 0Zm11.25-8.25a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" className="w-12 h-12" strokeWidth="1"/>
+            // Render tags table
+            const tagsTableHead = document.getElementById('tags-table-head');
+            tagsTableHead.innerHTML = `
+                <tr class="bg-slate-100">
+                    <th class="p-3 font-bold uppercase text-slate-600 border-b border-slate-200">${T.tagsTableHeader[0]}</th>
+                    <th class="p-3 font-bold uppercase text-slate-600 border-b border-slate-200">${T.tagsTableHeader[1]}</th>
+                    <th class="p-3 font-bold uppercase text-slate-600 border-b border-slate-200">${T.tagsTableHeader[2]}</th>
+                </tr>`;
+            const tagsTableBody = document.getElementById('tags-table-body');
+            tagsTableBody.innerHTML = '';
+            T.tags.forEach(t => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50';
+                row.innerHTML = `
+                    <td class="p-3 border-b border-slate-200 font-mono font-semibold text-purple-700">${t.tag}</td>
+                    <td class="p-3 border-b border-slate-200 text-slate-600">${t.desc}</td>
+                    <td class="p-3 border-b border-slate-200 text-slate-500 text-sm" dir="ltr"><pre class="bg-slate-100 p-2 rounded"><code>${t.example}</code></pre></td>
+                `;
+                tagsTableBody.appendChild(row);
+            });
+
+            // Render workflow
+            const workflowContainer = document.getElementById('workflow-container');
+            workflowContainer.innerHTML = '';
+            T.workflowSteps.forEach(step => {
+                const div = document.createElement('div');
+                div.className = 'p-4 border-r-4 border-purple-500 bg-purple-50 rounded-lg';
+                div.innerHTML = `
+                    <h3 class="font-bold text-xl mb-2 text-purple-900 flex items-center gap-3"><span class="text-3xl">${step.icon}</span>${step.title}</h3>
+                    <p class="text-purple-800">${step.content}</p>
+                `;
+                workflowContainer.appendChild(div);
+            });
+
+            // Render advanced topics
+            const advancedAccordion = document.getElementById('advanced-accordion');
+            advancedAccordion.innerHTML = '';
+            T.advancedTopics.forEach(topic => {
+                 const div = document.createElement('div');
+                div.className = 'border border-slate-200 rounded-lg';
+                div.innerHTML = `
+                    <button class="accordion-header w-full text-right p-4 flex justify-between items-center">
+                        <span class="font-semibold text-slate-700">${topic.title}</span>
+                        <svg class="accordion-icon w-5 h-5 text-slate-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="accordion-content p-4 pt-0 text-slate-600" style="display: none;">
+                        <div class="prose max-w-none">${topic.content}</div>
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900">الدليل الإرشادي التفاعلي</h1>
-                    <p className="text-lg text-gray-600 mt-4 max-w-3xl mx-auto">دليلك الكامل لإتقان "محول الأسئلة الذكي". هذا الدليل مبني باستخدام React لمساعدتك على تحقيق أقصى استفادة من كل ميزة.</p>
-                </header>
+                `;
+                advancedAccordion.appendChild(div);
+            });
 
-                <main className="prose-ar max-w-none">
-                    <section className="mb-16">
-                        <WorkflowDiagram />
-                    </section>
+            // Render master prompt
+            document.getElementById('master-prompt-container').innerHTML = `
+                <div class="prompt-code bg-slate-800 rounded-xl text-white p-4">
+                    <button class="copy-btn" onclick="copyCode(this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        <span>${T.copyBtnText}</span>
+                    </button>
+                    <pre class="whitespace-pre-wrap text-sm" dir="ltr"><code>${T.masterPrompt}</code></pre>
+                </div>`;
 
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-center mb-8">أنواع الأسئلة وبنيتها</h2>
-                        <div className="mb-4 border-b border-gray-200">
-                            <nav className="-mb-px flex flex-wrap gap-x-2" aria-label="Tabs">
-                                {Object.entries(questionTypesData).map(([key, { name, icon }]) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => setActiveTab(key)}
-                                        className={`flex items-center gap-2 whitespace-nowrap py-3 px-4 text-md font-medium border-b-2 transition-colors duration-200 rounded-t-lg ${
-                                            activeTab === key ? 'border-indigo-500 bg-indigo-50 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        <Icon path={icon} className="w-5 h-5" strokeWidth="2" />
-                                        {name}
-                                    </button>
-                                ))}
-                            </nav>
-                        </div>
-                        <div>{renderTabContent()}</div>
-                    </section>
-                    
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-center mb-8">التنسيق المتقدم</h2>
-                         <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-xl text-indigo-600">الأسئلة متعددة الأجزاء</h3>
-                                <p className="mt-2">استخدم `[STATEMENT]` لمقدمة السؤال، و`[PART]` لكل جزء. الأداة ستفهم البنية تلقائيًا.</p>
-                                <CodeBlock code={`[STATEMENT]\nاقرأ القطعة التالية ثم أجب...\n\n---\n\n[PART]\ntype: mcq\n[STEM]\nما الفكرة الرئيسية للقطعة؟\n[CHOICES]\n* ...`} />
-                            </div>
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-xl text-indigo-600">المسافات المخصصة</h3>
-                                <p className="mt-2">لإضافة مسافة إضافية (`&lt;span&gt;`) في أي مكان، استخدم الوسم `[SPACE]`. تحكم كامل في التنسيق.</p>
-                                <CodeBlock code={`[STEM]\nما عاصمة مصر[SPACE].`} />
-                            </div>
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                <h3 className="font-bold text-xl text-indigo-600">المعرفات المؤقتة (IDs)</h3>
-                                <p className="mt-2">عند إنشاء سؤال جديد، استخدم `id: new1`، `id: new2` وهكذا. ستطالبك الأداة بإدخال الأرقام الرسمية عند التحليل.</p>
-                                <CodeBlock code={`id: new1\ntype: mcq\n...`} />
-                            </div>
-                        </div>
-                    </section>
+            // Render specific prompts
+            const specificPromptsContainer = document.getElementById('specific-prompts-container');
+            specificPromptsContainer.innerHTML = '';
+            T.specificPrompts.forEach(p => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <h3 class="font-bold mb-2 text-lg">${p.title}</h3>
+                    <div class="prompt-code bg-slate-800 rounded-xl text-white p-4">
+                        <button class="copy-btn" onclick="copyCode(this)">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            <span>${T.copyBtnText}</span>
+                        </button>
+                        <pre class="whitespace-pre-wrap text-sm" dir="ltr"><code>${p.code}</code></pre>
+                    </div>
+                `;
+                specificPromptsContainer.appendChild(div);
+            });
 
-                    <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-center mb-8">تسخير قوة الذكاء الاصطناعي</h2>
-                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                             <p className="mt-2 text-gray-600">ميزة "التحسين بالـ AI" تحول النص الفوضوي إلى تنسيق منظم. شاهد كيف تتعامل مع نص غير منسق تمامًا:</p>
-                            <div className="grid md:grid-cols-2 gap-4 mt-4">
-                                <div>
-                                    <h5 className="font-semibold text-red-600">النص الخام (قبل)</h5>
-                                    <div className="code-block mt-2 text-xs">س1: ما عاصمة السعودية الرياض * جدة - الدمام. س2 لونه أزرق و طعمه حلو ما هو؟ السماء. الإجابة: المحيط.</div>
-                                </div>
-                                <div>
-                                    <h5 className="font-semibold text-green-600">النص المنسق (بعد)</h5>
-                                    <div className="code-block mt-2 text-xs">{`type: mcq
-[STEM]
-ما عاصمة السعودية
-[CHOICES]
-* الرياض
-- جدة
-- الدمام
----
-type: string
-[STEM]
-لونه أزرق و طعمه حلو ما هو؟ السماء.
-[ANSWER]
-المحيط`}</div>
-                                </div>
-                            </div>
-                             <ProTip>
-                                للحصول على أفضل النتائج من الذكاء الاصطناعي، حاول أن يكون النص الأصلي واضحًا قدر الإمكان. حتى لو لم يكن منسقًا، فإن استخدام ترقيم واضح أو علامات مميزة للإجابات الصحيحة يساعد النموذج على فهم قصدك بشكل أسرع وأكثر دقة.
-                            </ProTip>
-                        </div>
-                    </section>
+            // Render FAQ
+            const faqContainer = document.getElementById('faq-container');
+            faqContainer.innerHTML = '';
+            T.faqs.forEach(faq => {
+                const div = document.createElement('div');
+                div.className = 'border border-slate-200 rounded-lg';
+                div.innerHTML = `
+                    <button class="accordion-header w-full text-right p-4 flex justify-between items-center">
+                        <span class="font-semibold text-slate-700">${faq.q}</span>
+                        <svg class="accordion-icon w-5 h-5 text-slate-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="accordion-content p-4 pt-0 text-slate-600" style="display: none;">
+                        <p>${faq.a}</p>
+                    </div>
+                `;
+                faqContainer.appendChild(div);
+            });
+            
+            // Re-attach accordion listeners
+            document.querySelectorAll('.accordion-header').forEach(header => {
+                header.addEventListener('click', handleAccordionClick);
+            });
+        }
 
-                </main>
-            </div>
-        </div>
-    );
-};
+        function handleTabClick(e) {
+            const tabButton = e.target.closest('.tab-btn');
+            if (!tabButton) return;
 
-export default App;
+            document.querySelector('#tabs .active').classList.remove('active');
+            tabButton.classList.add('active');
+
+            document.querySelector('#tab-contents .active').classList.remove('active');
+            document.getElementById(tabButton.dataset.tab).classList.add('active');
+        }
+
+        function handleAccordionClick(e) {
+            const header = e.currentTarget;
+            const content = header.nextElementSibling;
+            const isActive = header.classList.contains('active');
+            
+            if (!isActive) {
+                header.classList.add('active');
+                content.style.display = 'block';
+            } else {
+                header.classList.remove('active');
+                content.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            currentLang = localStorage.getItem('guideLang') || 'ar';
+            renderContent(currentLang);
+            
+            document.getElementById('lang-switcher').addEventListener('click', () => {
+                currentLang = currentLang === 'ar' ? 'en' : 'ar';
+                localStorage.setItem('guideLang', currentLang);
+                renderContent(currentLang);
+            });
+        });
+
+        function copyCode(button) {
+            const pre = button.nextElementSibling;
+            const code = pre.querySelector('code');
+            const textToCopy = code.innerText;
+            
+            const tempTextarea = document.createElement('textarea');
+            tempTextarea.value = textToCopy;
+            document.body.appendChild(tempTextarea);
+            tempTextarea.select();
+            
+            try {
+                document.execCommand('copy');
+                const originalText = button.querySelector('span').textContent;
+                button.querySelector('span').textContent = translations[currentLang].copiedBtnText;
+                button.style.backgroundColor = '#10b981';
+                setTimeout(() => {
+                    button.querySelector('span').textContent = translations[currentLang].copyBtnText;
+                    button.style.backgroundColor = '';
+                }, 2000);
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+            }
+            
+            document.body.removeChild(tempTextarea);
+        }
+    </script>
+</body>
+</html>
+�
